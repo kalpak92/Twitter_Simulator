@@ -38,8 +38,68 @@ defmodule Server do
   end
 
   @doc """
-  Register Me
+  updateMentionsMap
   """
+  def update_map_of_mentions([tweet_mention | tweet_mentions], idx) do
+    elements =
+        if :ets.lookup(:map_of_mentions, tweet_mention) == [] do
+          element = MapSet.new
+          MapSet.put(element, idx)
+        else
+          [{_, element}] = :ets.lookup(:map_of_mentions, tweet_mention)
+          MapSet.put(element, idx)
+        end
+
+        :ets.insert(:map_of_mentions, {tweet_mention, elements})
+        update_map_of_mentions(tweet_mentions, idx)
+  end
+
+  def update_map_of_mentions([], _) do
+
+  end
+
+  @doc """
+  updateHashtagMap
+  """
+  def update_map_of_hashtags([tweet_hashtag| tweet_hashtags], idx) do
+    elements =
+        if :ets.lookup(:map_of_hashtag, tweet_hashtag) == [] do
+          element = MapSet.new
+          MapSet.put(element, idx)
+        else
+          [{_, element}] = :ets.lookup(:map_of_hashtag, tweet_hashtag)
+          MapSet.put(element, idx)
+        end
+
+        :ets.insert(:map_of_hashtag, {tweet_hashtag, elements})
+        update_map_of_hashtags(tweet_hashtags, idx)
+  end
+
+  def update_map_of_hashtags([], _) do
+
+  end
+
+  @doc """
+  Send to followers
+  """
+  def broadcast_to_followers([first | followers_list], idx, twitteratti_name, tweet_content) do
+    spawn(fn  ->
+      GenServer.cast({String.to_atom(first), elem(List.first(:ets.lookup(:map_of_user_to_ip, first)), 1)},
+                      {:receive_tweet, idx, twitteratti_name, tweet_content})
+          end)
+
+    broadcast_to_followers(followers_list, idx, twitteratti_name, tweet_content)
+  end
+
+  def broadcast_to_followers([], _, _, _) do
+
+  end
+
+
+  @doc """
+  retweet
+  """
+
   def handle_cast({:register_twitteratti_self, twitteratti_name, ip_user}, state) do
     id_next = state
     status_of_registration = :ets.insert_new(:map_of_user_to_ip, {twitteratti_name, ip_user})
@@ -114,68 +174,6 @@ defmodule Server do
     {:noreply, id_next + 1}
   end
 
-  @doc """
-  updateMentionsMap
-  """
-  def update_map_of_mentions([tweet_mention | tweet_mentions], idx) do
-    elements =
-        if :ets.lookup(:map_of_mentions, tweet_mention) == [] do
-          element = MapSet.new
-          MapSet.put(element, idx)
-        else
-          [{_, element}] = :ets.lookup(:map_of_mentions, tweet_mention)
-          MapSet.put(element, idx)
-        end
-
-        :ets.insert(:map_of_mentions, {tweet_mention, elements})
-        update_map_of_mentions(tweet_mentions, idx)
-  end
-
-  def update_map_of_mentions([], _) do
-
-  end
-
-  @doc """
-  updateHashtagMap
-  """
-  def update_map_of_hashtags([tweet_hashtag| tweet_hashtags], idx) do
-    elements =
-        if :ets.lookup(:map_of_hashtag, tweet_hashtag) == [] do
-          element = MapSet.new
-          MapSet.put(element, idx)
-        else
-          [{_, element}] = :ets.lookup(:map_of_hashtag, tweet_hashtag)
-          MapSet.put(element, idx)
-        end
-
-        :ets.insert(:map_of_hashtag, {tweet_hashtag, elements})
-        update_map_of_hashtags(tweet_hashtags, idx)
-  end
-
-  def update_map_of_hashtags([], _) do
-
-  end
-
-  @doc """
-  Send to followers
-  """
-  def broadcast_to_followers([first | followers_list], idx, twitteratti_name, tweet_content) do
-    spawn(fn  ->
-      GenServer.cast({String.to_atom(first), elem(List.first(:ets.lookup(:map_of_user_to_ip, first)), 1)},
-                      {:receive_tweet, idx, twitteratti_name, tweet_content})
-          end)
-
-    broadcast_to_followers(followers_list, idx, twitteratti_name, tweet_content)
-  end
-
-  def broadcast_to_followers([], _, _, _) do
-
-  end
-
-
-  @doc """
-  retweet
-  """
   def handle_cast({:retweet, twitteratti_name, tweet_idx}, state) do
     id_next = state
 
@@ -201,6 +199,8 @@ defmodule Server do
     {:noreply, id_next + 1}
   end
 
+
+
   @doc """
   myMentions
   """
@@ -219,43 +219,6 @@ defmodule Server do
                                   elem(List.first(:ets.lookup(:map_of_user_to_ip, twitteratti_name)), 1)},
                                   {:receive_mentions_self, tweets_mention}) end)
         {:noreply, state}
-  end
-
-
-
-  @doc """
-  tweets with hashtag
-  """
-  def handle_cast({:tweets_with_hashtag, hashtag, twitteratti_name}, state) do
-    tweet_set =
-                if :ets.lookup(:map_of_hashtag, hashtag) == [] do
-                  MapSet.new
-                else
-                  [{_, set}] = :ets.lookup(:map_of_hashtag, hashtag)
-                  set
-                end
-
-    tweets_with_hashtag  = get_hashtag_tweets(MapSet.to_list(tweet_set), [])
-
-    spawn(fn -> GenServer.cast({String.to_atom(twitteratti_name),
-                elem(List.first(:ets.lookup(:map_of_user_to_ip, twitteratti_name)), 1)},
-                {:get_hashtag_results, tweets_with_hashtag})
-              end)
-
-    {:noreply, state}
-  end
-
-  @doc """
-  getHashtags
-  """
-  def get_hashtag_tweets([head|last], tweets_with_hashtag) do
-    [{idx, twitteratti_name, tweet_content}] = :ets.lookup(:tweet_database, head)
-    tweets_with_hashtags = List.insert_at(tweets_with_hashtag, 0, {head, {twitteratti_name, tweet_content}})
-    get_hashtag_tweets(last, tweets_with_hashtag)
-  end
-
-  def get_hashtag_tweets([], tweets_with_hashtag) do
-    tweets_with_hashtag
   end
 
   @doc """
@@ -288,6 +251,168 @@ defmodule Server do
     {:noreply, state}
   end
 
+
+  @doc """
+  tweets with hashtag
+  """
+  def handle_cast({:tweets_with_hashtag, hashtag, twitteratti_name}, state) do
+    tweet_set =
+                if :ets.lookup(:map_of_hashtag, hashtag) == [] do
+                  MapSet.new
+                else
+                  [{_, set}] = :ets.lookup(:map_of_hashtag, hashtag)
+                  set
+                end
+
+    tweets_with_hashtag  = get_hashtag_tweets(MapSet.to_list(tweet_set), [])
+
+    spawn(fn -> GenServer.cast({String.to_atom(twitteratti_name),
+                elem(List.first(:ets.lookup(:map_of_user_to_ip, twitteratti_name)), 1)},
+                {:get_hashtag_results, tweets_with_hashtag})
+              end)
+
+    {:noreply, state}
+  end
+
+  def initializetables() do
+    :ets.new(:map_of_hashtag, [:set, :public, :named_table])
+    :ets.new(:map_of_mentions, [:set, :public, :named_table])
+    :ets.new(:table_of_followers, [:set, :public, :named_table])
+    :ets.new(:table_of_follows, [:set, :public, :named_table])
+    :ets.new(:tweet_database, [:set, :public, :named_table])
+    :ets.new(:map_of_user_to_ip, [:set, :public, :named_table])
+  end
+
+  @doc """
+  code for exunit calls - insert into tweet db
+  """
+  def inserttweetintodatabase(tweetId, username, tweet) do
+    {content, hashtags, mentions} = tweet
+    :ets.insert(:tweet_database, {tweetId, username, content})
+    update_map_of_mentions(mentions, tweetId)
+    update_map_of_hashtags(hashtags, tweetId)
+  end
+
+  @doc """
+  code for exunit calls - insert into followers and follows
+   db
+  """
+  def addFollower(user,follower) do
+    map_set =
+              if :ets.lookup(:table_of_followers, user) == [] do
+                MapSet.new
+              else
+                [{_, set}] = :ets.lookup(:table_of_followers, user)
+                set
+              end
+
+    map_set = MapSet.put(map_set, follower)
+
+    :ets.insert(:table_of_followers, {user, map_set})
+
+    map_set_2 =
+              if :ets.lookup(:table_of_follows, follower) == [] do
+                MapSet.new
+              else
+                [{_, set}] = :ets.lookup(:table_of_follows, follower)
+                set
+              end
+
+    map_set_2 = MapSet.put(map_set_2, user)
+
+    :ets.insert(:table_of_follows, {follower, map_set_2})
+
+  end
+  def printtweetdatabase() do
+    IO.inspect :ets.match(:tweet_database, {:"$1", :"$2", :"$3"})
+  end
+
+  def printmapofmentions() do
+    IO.inspect :ets.match(:map_of_mentions, {:"$1", :"$2"})
+  end
+
+  def printmapofhashtags() do
+    IO.inspect :ets.match(:map_of_hashtag, {:"$1", :"$2"})
+  end
+
+  def printfollowers() do
+    IO.inspect :ets.match(:table_of_followers, {:"$1", :"$2"})
+  end
+
+  def printsubscribed() do
+    IO.inspect :ets.match(:table_of_follows, {:"$1", :"$2"})
+  end
+
+  @doc """
+  code for exunit calls - find followers
+  """
+  def getfollowerlist(user) do
+    follower_set =
+    if :ets.lookup(:table_of_followers, user) == [] do
+      MapSet.new()
+    else
+      [{_, set}] = :ets.lookup(:table_of_followers, user)
+      set
+    end
+    MapSet.to_list(follower_set)
+  end
+
+  @doc """
+  code for exunit calls - find followers
+  """
+  def getfollowlist(user) do
+    follow_set =
+    if :ets.lookup(:table_of_follows, user) == [] do
+      MapSet.new()
+    else
+      [{_, set}] = :ets.lookup(:table_of_follows, user)
+      set
+    end
+    MapSet.to_list(follow_set)
+  end
+
+  @doc """
+  code for exunit calls - find tweet with hashtag
+  """
+  def findtweetwithhashtag(hashtag) do
+    tweet_set =
+      if :ets.lookup(:map_of_hashtag, hashtag) == [] do
+        MapSet.new()
+      else
+        [{_, set}] = :ets.lookup(:map_of_hashtag, hashtag)
+        set
+      end
+    _tweets_with_hashtag = get_hashtag_tweets(MapSet.to_list(tweet_set), [])
+  end
+
+  @doc """
+  code for exunit calls - find tweets with mention
+  """
+  def findtweetwithmention(mention) do
+    tweet_set =
+      if :ets.lookup(:map_of_mentions, mention) == [] do
+        MapSet.new()
+      else
+        [{_, set}] = :ets.lookup(:map_of_mentions, mention)
+        set
+      end
+    _tweets_with_mentions = get_mentions_tweet(MapSet.to_list(tweet_set), [])
+  end
+
+
+  @doc """
+  getHashtags
+  """
+  def get_hashtag_tweets([head|last], tweets_with_hashtag) do
+    [{_idx, twitteratti_name, tweet_content}] = :ets.lookup(:tweet_database, head)
+    tweets_with_hashtag = List.insert_at(tweets_with_hashtag, 0, {head, {twitteratti_name, tweet_content}})
+    get_hashtag_tweets(last, tweets_with_hashtag)
+  end
+
+  def get_hashtag_tweets([], tweets_with_hashtag) do
+    tweets_with_hashtag
+  end
+
   @doc """
   fetch Relevant Tweets
   """
@@ -310,7 +435,7 @@ defmodule Server do
     get_mentions_tweet(last, tweets_with_mention)
   end
 
-  def get_mentions_tweet(_, [], tweets_with_mention) do
+  def get_mentions_tweet([], tweets_with_mention) do
     tweets_with_mention
   end
 

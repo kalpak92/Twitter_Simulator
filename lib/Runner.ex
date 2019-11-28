@@ -31,16 +31,8 @@ defmodule Runner do
     :timer.sleep(:infinity)
   end
 
-
   @doc """
-  Log
-  """
-  def logging(string) do
-    IO.puts(string)
-  end
-
-  @doc """
-  setupStaticData
+  setupcontent
   """
   def generate_content(total_users, ip_address) do
     name_client = String.to_atom("clientname" <> "@" <> get_ip_address(0))
@@ -51,7 +43,7 @@ defmodule Runner do
     :ets.new(:fields_static, [:named_table])
     :ets.insert(:fields_static, {"total_number_of_nodes", total_users})
 
-    # TODO : Static Content Table
+    # Using ETS tables to store data
     :ets.insert(
       :fields_static,
       {"tweet_sample",[
@@ -116,7 +108,7 @@ defmodule Runner do
   end
 
   @doc """
-  find IP
+  find IP addess
   """
   def get_ip_address(iterator) do
     ip_list = Enum.at(:inet.getif() |> Tuple.to_list(), 1)
@@ -149,9 +141,9 @@ defmodule Runner do
     [{_, num_of_clients}] = :ets.lookup(:fields_static, "total_number_of_nodes")
     IO.inspect("check mentions - self")
 
-    # kill 5 random ids and save them to a list
-    client_id = for i <- 1..5 do
-      client = Enum.random(1..num_of_clients)
+    # pick 5 random ids and save them to a list for mentions
+    client_id = for _i <- 1..5 do
+      Enum.random(1..num_of_clients)
     end
 
     for i <- client_id do
@@ -182,11 +174,12 @@ defmodule Runner do
   def clients_kill(ip_address) do
     [{_, num_of_clients}] = :ets.lookup(:fields_static, "total_number_of_nodes")
 
+    # pick 5 random ids and kill them
     client_id_list =
-      for i <- 1..5  do
-        client  = Enum.random(1..num_of_clients)
+      for _i <- 1..5  do
+        Enum.random(1..num_of_clients)
       end
-
+    IO.inspect("Deleting 5 random clients")
     IO.inspect(client_id_list)
 
     for j <- client_id_list do
@@ -196,8 +189,8 @@ defmodule Runner do
     # sleep
     Process.sleep(8000)
 
-    # start the GenServer again
-    IO.inspect("STARTING AGAIN")
+    # start the clients again
+    IO.inspect("Stating them again")
 
     for j <- client_id_list do
       spawn(fn ->
@@ -208,8 +201,6 @@ defmodule Runner do
         Client.user_registration("twitteratti" <> Integer.to_string(j), ip_address)
       end)
     end
-
-    IO.inspect("Are we reaching here.")
   end
 
   @doc """
@@ -221,7 +212,7 @@ defmodule Runner do
     fanfollowers_assignment(num_of_clients, ip_address)
     Process.sleep(5000)
 
-    latency  = compute_frequency(num_of_clients)
+    latency  = 2890
 
     thread_count =
       if 100_000 / num_of_clients > 1 do
@@ -243,7 +234,7 @@ defmodule Runner do
 
         {"twitteratti" <> Integer.to_string(client), thread_count * 1000 / (latency * client)}
       end
-
+      IO.inspect("Clients and their frequencies")
       IO.inspect(frequency_list)
 
   end
@@ -260,13 +251,6 @@ defmodule Runner do
     compute_addition(last, addition)
   end
 
-  @doc """
-  calculateFrequency
-  """
-  def compute_frequency(num_of_clients) do
-    2890
-  end
-
   def fanfollowers_assignment(num_of_clients, ip_address) do
     h_list =
       for j <- 1..num_of_clients do
@@ -275,25 +259,25 @@ defmodule Runner do
 
     constant  = 100 / compute_addition(h_list, 0)
 
-    for t <- 1..num_of_clients, i <- 1..round(Float.floor(constant / t))  do
+    for t <- 1..num_of_clients, _i <- 1..round(Float.floor(constant / t))  do
       fan_followers = "twitteratti" <> Integer.to_string(Enum.random(1..num_of_clients))
       being_followed = "twitteratti" <> Integer.to_string(t)
 
       spawn(fn -> Client.follower_subscription(fan_followers, being_followed, ip_address) end)
     end
 
-    count_number_of_followers =
+    _count_number_of_followers =
       for t <- 1..num_of_clients  do
         {"twitteratti" <> Integer.to_string(t), round(Float.floor(constant / t))}
       end
-
-    IO.inspect(count_number_of_followers)
+    IO.inspect("Assigining Followers:")
+    #IO.inspect(count_number_of_followers)
   end
 
   @doc """
   Get the content of the tweet based on the username
   """
-  def get_details_of_tweet(user_name) do
+  def get_details_of_tweet(_user_name) do
     [{_, tweet_sample}] = :ets.lookup(:fields_static, "tweet_sample")
 
     select_random_index = Enum.random(1..Enum.count(tweet_sample))
@@ -318,7 +302,7 @@ defmodule Runner do
 
     mention_list =
       if number_of_mentions > 0 do
-        for i <- Enum.to_list(1..number_of_mentions) do
+        for _i <- Enum.to_list(1..number_of_mentions) do
           "@twitteratti" <> Integer.to_string(Enum.random(1..number_of_clients)) <> " "
         end
       else
@@ -339,6 +323,13 @@ defmodule Runner do
 
   def compress([], sentence) do
     sentence
+  end
+
+  @doc """
+  Log
+  """
+  def logging(string) do
+    IO.puts(string)
   end
 
 end

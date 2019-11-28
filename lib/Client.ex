@@ -53,6 +53,9 @@ defmodule Client do
     GenServer.start_link(__MODULE__, [twitteratti_name, ip_server, MapSet.new, [], [], [], []], name: String.to_atom(twitteratti_name))
   end
 
+  def init(init_arg) do
+    {:ok, init_arg}
+  end
   def init(twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned) do
     {:ok, {twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned}}
   end
@@ -75,7 +78,13 @@ defmodule Client do
     {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
   end
 
-  def handle_cast({:user_registration, twitteratti_name}, state) do
+  def handle_cast({:fetch_mentions}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:mentions_self, twitteratti_name})
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:user_registration, _twitteratti_name}, state) do
     [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
     GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:register_twitteratti_self, twitteratti_name, Node.self()})
     {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
@@ -84,6 +93,49 @@ defmodule Client do
   def handle_cast({:retweet, self_id, tweet_index}, state) do
     [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
     GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:retweet, self_id, tweet_index})
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:follower_subscription, self_id, _twitteratti_name}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:follower_subscription, self_id, twitteratti_name})
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:search_by_hashtag, hashtag}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:tweets_with_hashtag, hashtag, twitteratti_name})
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:get_hashtag_results, _list_of_hashtags}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:query_tweets_self}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:query_tweets, twitteratti_name})
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:receive_query_tweets_results, _list_of_relevant_tweets}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
+  end
+
+  def handle_cast({:tweet, content_tweet}, state) do
+    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
+
+    content = content_tweet
+    words_separated = String.split(content, " ")
+    hashtag_list = search_hashtags(words_separated, [])
+    mention_list = search_mentions(words_separated, [])
+
+    body_of_tweet = {content, hashtag_list, mention_list}
+
+    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:tweet, twitteratti_name, body_of_tweet})
+
     {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
   end
 
@@ -96,12 +148,6 @@ defmodule Client do
     tweet_selected = Enum.at(tweet_list, random_index - 1)
 
     {:reply, tweet_selected, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-  def handle_cast({:follower_subscription, self_id, twitteratti_name}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:follower_subscription, self_id, twitteratti_name})
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
   end
 
   def user_registration(twitteratti_name, ip_server) do
@@ -125,59 +171,14 @@ defmodule Client do
     end
   end
 
-
-  def handle_cast({:search_by_hashtag, hashtag}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:tweets_with_hashtag, hashtag, twitteratti_name})
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-  def handle_cast({:get_hashtag_results, list_of_hashtags}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-  def handle_cast({:fetch_mentions}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:mentions_self, twitteratti_name})
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
   # def handle_cast({:fetch_mentions_self, list_of_mentions}, state) do
   #   [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
   #   {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
   # end
 
-  def handle_cast({:query_tweets_self}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:query_tweets, twitteratti_name})
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-  def handle_cast({:receive_query_tweets_results, list_of_relevant_tweets}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-  def handle_cast({:tweet, content_tweet}, state) do
-    [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-
-    content = content_tweet
-    words_separated = String.split(content, " ")
-    hashtag_list = search_hashtags(words_separated, [])
-    mention_list = search_mentions(words_separated, [])
-
-    body_of_tweet = {content, hashtag_list, mention_list}
-
-    GenServer.cast({:server_main, String.to_atom("TwitterServer_Main@"<>ip_server)}, {:tweet, twitteratti_name, body_of_tweet})
-
-    {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  end
-
-
   def search_hashtags([first|last], hashtag_list) do
     if (String.first(first)=="#") do
-      [_, element] = String.split(first, "#")
+      [_, _element] = String.split(first, "#")
       search_hashtags(last, List.insert_at(hashtag_list, 0, first))
     else
       search_hashtags(last, hashtag_list)
