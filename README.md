@@ -1,42 +1,53 @@
-# Project4
+# Project 4.1
 
 **Twitter Clone Part 1**
 
 ## Group Members
-Sagnik Ghosh  UFID 3343-6044 <br />
-Kalpak Seal  UFID 8241-7219
+- Sagnik Ghosh  UFID 3343-6044
+- Kalpak Seal  UFID 8241-7219
 
-## HOW TO RUN
-unzip the project <br />
-in the directory run epmd -d <br />
+## Project Execution
 
-for starting the Server <br />
-/project4 <br />
+- unzip the project
+- in the directory run 
+    ```
+    epmd -d
+    ```
 
-for starting the Simulator (clients) <br />
-/project4 serverIP numClients <br />
+- Start the Server
+    ```
+    mix escript.build
+    /project4
+    ```
 
-for running the tests <br />
-In the project directory enter command 'mix test' <br />
+- Start the Clients
+    ```
+    /project4 serverIP numClients
+    ```
 
-Tweets received at the server will be logged on the console on the engine window along with the tweet ID. <br />
+## Unit Test execution
+
+-   In the project directory enter command `mix test` 
+
+Tweets received at the server will be logged on the console on the engine window along with the tweet ID.
+
 Tweets received by the users will be logged on the console on the simulator window.
 
 ## What is working
-Twitter Engine : <br />
-    Register account and delete account <br />
-    Subscribe to other users according to Zipf distribution <br />
-    Tweet endlessly <br />
-    Retweet the tweets received randomly <br />
-    Query Tweets <br />
-    Query Tweets by mentions <br />
-    Query Tweets by Hashtag <br />
-    Receive Live tweets
+Twitter Engine :.
+- Register account and delete account.
+- Subscribe to other users according to Zipf distribution.
+- Tweet endlessly.
+- Retweet the tweets received randomly.
+- Query Tweets.
+- Query Tweets by mentions.
+- Query Tweets by Hashtag.
+- Receive Live tweets
 
-Simulator : <br />
-    Subscribing users according to Zipf Distribution <br />
-    Setting the frequency of tweets according to Zipf (more popular tweets more frequently) <br />
-    Retweet randomly any of the received tweet. This may include a tweet from someone the user follows, a tweet where the user is mentioned or a tweet queried from a hashtag. <br />
-    Period of Live connection and disconnection
+### Runner Module Utility
+- Subscribing users according to Zipf Distribution.
+- Setting the frequency of tweets according to Zipf (more popular tweets more frequently).
+- Retweet randomly any of the received tweet. This may include a tweet from someone the user follows, a tweet where the user is mentioned or a tweet queried from a hashtag..
+- Period of Live connection and disconnection
 
 

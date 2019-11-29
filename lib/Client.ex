@@ -171,11 +171,6 @@ defmodule Client do
     end
   end
 
-  # def handle_cast({:fetch_mentions_self, list_of_mentions}, state) do
-  #   [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned] = state
-  #   {:noreply, [twitteratti_name, ip_server, tweets_seen, list_of_hashtags, list_of_mentions, list_of_relevant_tweets, tweets_mentioned]}
-  # end
-
   def search_hashtags([first|last], hashtag_list) do
     if (String.first(first)=="#") do
       [_, _element] = String.split(first, "#")
